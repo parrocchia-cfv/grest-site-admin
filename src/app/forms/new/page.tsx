@@ -54,7 +54,7 @@ export default function NewFormPage() {
     setSaving(true);
     try {
       const created = await createModule(module, authHandle);
-      router.push(`/forms/${created.id}/edit`);
+      router.push(`/forms/edit?id=${encodeURIComponent(created.id)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Salvataggio fallito');
     } finally {

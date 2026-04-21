@@ -157,7 +157,7 @@ export default function FormsListPage() {
                           Copia link
                         </Button>
                       </Tooltip>
-                      <Button component={Link} href={`/forms/${m.id}/edit`} size="small">
+                      <Button component={Link} href={`/forms/edit?id=${encodeURIComponent(m.id)}`} size="small">
                         Modifica
                       </Button>
                     </TableCell>

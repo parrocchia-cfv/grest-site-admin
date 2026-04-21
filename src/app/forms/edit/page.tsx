@@ -1,12 +1,11 @@
 'use client';
 
-import { useRouter, useParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AdminLayout } from '@/components/AdminLayout';
 import { PageHeader } from '@/components/PageHeader';
 import { FormBuilder } from '@/components/form-builder/FormBuilder';
-import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
@@ -17,23 +16,53 @@ import { getModule, updateModule } from '@/lib/api-client';
 import { validateEmailOnSubmitForSave } from '@/lib/validate-email-on-submit';
 
 export default function EditFormPage() {
+  return (
+    <Suspense
+      fallback={
+        <ProtectedRoute>
+          <AdminLayout>
+            <Paper sx={{ p: 2 }}>
+              <Typography color="text.secondary">Caricamento…</Typography>
+            </Paper>
+          </AdminLayout>
+        </ProtectedRoute>
+      }
+    >
+      <EditFormPageInner />
+    </Suspense>
+  );
+}
+
+function EditFormPageInner() {
   const router = useRouter();
-  const params = useParams();
-  const id = params.id as string;
+  const search = useSearchParams();
+  const id = (search.get('id') || '').trim();
   const auth = useAuth();
+
+  const authHandle = useMemo(
+    () => ({
+      getAccessToken: auth.getAccessToken,
+      getRefreshToken: auth.getRefreshToken,
+      setTokens: auth.setTokens,
+      clearTokens: auth.clearTokens,
+    }),
+    [auth.getAccessToken, auth.getRefreshToken, auth.setTokens, auth.clearTokens]
+  );
+
   const [module, setModule] = useState<Module | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const authHandle = {
-    getAccessToken: auth.getAccessToken,
-    getRefreshToken: auth.getRefreshToken,
-    setTokens: auth.setTokens,
-    clearTokens: auth.clearTokens,
-  };
-
   useEffect(() => {
+    if (!id) {
+      setModule(null);
+      setError('Manca il parametro `id` (es. /forms/edit?id=...)');
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
     getModule(id, authHandle)
       .then((m) => {
         setModule(m ?? null);
@@ -41,7 +70,7 @@ export default function EditFormPage() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Errore'))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, authHandle]);
 
   const handleSave = useCallback(async () => {
     if (!module) return;
@@ -107,7 +136,11 @@ export default function EditFormPage() {
             </Button>
           }
         />
-        {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
+        {error && (
+          <Alert severity="error" sx={{ mb: 1.5 }}>
+            {error}
+          </Alert>
+        )}
         <Paper sx={{ p: 1.25 }}>
           <FormBuilder module={module} onChange={setModule} />
         </Paper>
@@ -115,3 +148,4 @@ export default function EditFormPage() {
     </ProtectedRoute>
   );
 }
+
