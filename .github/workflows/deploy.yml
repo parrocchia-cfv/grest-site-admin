@@ -50,11 +50,16 @@ jobs:
             fi
           }
 
-          if [ -f package.json ] && grep -q '"workspaces"' package.json; then
+          if [ -f package.json ] && grep -q '"workspaces"' package.json && [ -f apps/admin/package.json ]; then
             echo "Build admin: monorepo (npm workspaces)"
             npm_install
             npm run build --workspace=apps/admin
             echo "PAGES_OUT=apps/admin/out" >> "$GITHUB_ENV"
+          elif [ -f package.json ] && [ -f next.config.js ]; then
+            echo "Build admin: repository root = app admin"
+            npm_install
+            npm run build
+            echo "PAGES_OUT=out" >> "$GITHUB_ENV"
           elif [ -f apps/admin/package.json ]; then
             echo "Build admin: cartella apps/admin senza workspaces in root"
             cd apps/admin
