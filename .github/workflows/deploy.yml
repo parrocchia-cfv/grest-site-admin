@@ -42,6 +42,7 @@ jobs:
       - name: Install and build admin
         run: |
           set -e
+          PAGES_OUT=""
           npm_install() {
             if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
               npm ci
@@ -54,22 +55,24 @@ jobs:
             echo "Build admin: monorepo (npm workspaces)"
             npm_install
             npm run build --workspace=apps/admin
-            echo "PAGES_OUT=apps/admin/out" >> "$GITHUB_ENV"
+            PAGES_OUT="apps/admin/out"
           elif [ -f package.json ] && [ -f next.config.js ]; then
             echo "Build admin: repository root = app admin"
             npm_install
             npm run build
-            echo "PAGES_OUT=out" >> "$GITHUB_ENV"
+            PAGES_OUT="out"
           elif [ -f apps/admin/package.json ]; then
             echo "Build admin: cartella apps/admin senza workspaces in root"
             cd apps/admin
             npm_install
             npm run build
-            echo "PAGES_OUT=apps/admin/out" >> "$GITHUB_ENV"
+            PAGES_OUT="apps/admin/out"
           else
             echo "::error::Non trovo apps/admin/package.json."
             exit 1
           fi
+
+          echo "PAGES_OUT=$PAGES_OUT" >> "$GITHUB_ENV"
 
           if [ ! -d "$PAGES_OUT" ]; then
             echo "::error::Cartella output non trovata: $PAGES_OUT"
