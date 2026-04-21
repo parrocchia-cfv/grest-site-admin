@@ -88,6 +88,25 @@ function isWaitlisted(row: AdminSubmissionRow): boolean {
   return !!(r && typeof r === 'object' && (r as Record<string, unknown>)._capacityWaitlisted === true);
 }
 
+function getWaitlistedWeeks(row: Record<string, unknown>): Set<string> {
+  const raw = row._capacityWaitlistedWeeks;
+  if (!Array.isArray(raw)) return new Set<string>();
+  return new Set(raw.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim()));
+}
+
+function formatSubmittedAt(value: string | null | undefined): string {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString('it-IT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function buildWeekStats(module: Module, submissions: AdminSubmissionRow[]): SedeWeekStats[] {
   const cfg = module.enrollmentCapacity;
   if (!cfg?.enabled) return [];
@@ -100,13 +119,13 @@ function buildWeekStats(module: Module, submissions: AdminSubmissionRow[]): Sede
     const sedeRaw = row[cfg.sedeFieldId];
     if (typeof sedeRaw !== 'string' || !sedeRaw.trim()) continue;
     const sede = sedeRaw.trim();
-    const wait = isWaitlisted(sub);
+    const waitWeeks = getWaitlistedWeeks(row);
     for (const weekId of cfg.weekFieldIds) {
       if (!isWeekSelected(row[weekId], expected)) continue;
       const key = `${sede}::${weekId}`;
       const cur = counts.get(key) ?? { enrolled: 0, waitlisted: 0 };
       cur.enrolled += 1;
-      if (wait) cur.waitlisted += 1;
+      if (waitWeeks.has(weekId)) cur.waitlisted += 1;
       counts.set(key, cur);
     }
   }
@@ -354,7 +373,7 @@ export default function AnalyticsPage() {
       });
     }
     return out.sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
-  }, [submissions, waitlistConfig, waitlistSedeFilter, waitlistWeekFilter]);
+  }, [filteredSubmissions, waitlistConfig, waitlistSedeFilter, waitlistWeekFilter]);
 
   const userResponseColumns = useMemo(() => {
     const keys = new Set<string>();
@@ -697,7 +716,7 @@ export default function AnalyticsPage() {
                     const editUrl = buildPublicEditSubmissionUrl(editToken);
                     return (
                       <TableRow key={s.id}>
-                        <TableCell>{s.submittedAt ?? '—'}</TableCell>
+                        <TableCell>{formatSubmittedAt(s.submittedAt)}</TableCell>
                         <TableCell>{s.submissionGroupId ?? s.id}</TableCell>
                         <TableCell>{`${nome} ${cognome}`.trim() || '—'}</TableCell>
                         <TableCell>{email || '—'}</TableCell>
@@ -817,7 +836,7 @@ export default function AnalyticsPage() {
                       {waitlistRows.map((r) => (
                         <TableRow key={r.submissionId}>
                           <TableCell>{r.name}</TableCell>
-                          <TableCell>{r.submittedAt || '—'}</TableCell>
+                          <TableCell>{formatSubmittedAt(r.submittedAt)}</TableCell>
                           <TableCell>{r.submissionId}</TableCell>
                         </TableRow>
                       ))}
