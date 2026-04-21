@@ -1,0 +1,92 @@
+name: Deploy admin site to GitHub Pages
+
+on:
+  push:
+    branches: [main, master, develop, production]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages-admin
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify required secrets
+        run: |
+          if [ -z "$NEXT_PUBLIC_API_URL" ]; then
+            echo "::error::Aggiungi il secret NEXT_PUBLIC_API_URL (Settings → Secrets → Actions)."
+            exit 1
+          fi
+          if [ -z "$NEXT_PUBLIC_PUBLIC_SITE_URL" ]; then
+            echo "::warning::NEXT_PUBLIC_PUBLIC_SITE_URL non impostato: i link al sito pubblico potrebbero non comparire."
+          fi
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_PUBLIC_SITE_URL }}
+
+      - name: Install and build admin
+        run: |
+          set -e
+          npm_install() {
+            if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+              npm ci
+            else
+              npm install
+            fi
+          }
+
+          if [ -f package.json ] && grep -q '"workspaces"' package.json; then
+            echo "Build admin: monorepo (npm workspaces)"
+            npm_install
+            npm run build --workspace=apps/admin
+            echo "PAGES_OUT=apps/admin/out" >> "$GITHUB_ENV"
+          elif [ -f apps/admin/package.json ]; then
+            echo "Build admin: cartella apps/admin senza workspaces in root"
+            cd apps/admin
+            npm_install
+            npm run build
+            echo "PAGES_OUT=apps/admin/out" >> "$GITHUB_ENV"
+          else
+            echo "::error::Non trovo apps/admin/package.json."
+            exit 1
+          fi
+
+          if [ ! -d "$PAGES_OUT" ]; then
+            echo "::error::Cartella output non trovata: $PAGES_OUT"
+            echo "::error::Assicurati che apps/admin/next.config.js usi output: 'export'."
+            exit 1
+          fi
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_PUBLIC_SITE_URL }}
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ env.PAGES_OUT }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
