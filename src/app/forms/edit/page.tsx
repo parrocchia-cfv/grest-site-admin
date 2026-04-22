@@ -38,6 +38,7 @@ function EditFormPageInner() {
   const search = useSearchParams();
   const id = (search.get('id') || '').trim();
   const auth = useAuth();
+  const canManageModules = Boolean(auth.user?.isSuperadmin || auth.user?.permissions.manageModules);
 
   const authHandle = useMemo(
     () => ({
@@ -127,6 +128,10 @@ function EditFormPageInner() {
   return (
     <ProtectedRoute>
       <AdminLayout>
+        {!canManageModules ? (
+          <Alert severity="error">Non hai i permessi per modificare moduli.</Alert>
+        ) : (
+          <>
         <PageHeader
           title={`Modifica: ${module.meta?.title?.it ?? module.id}`}
           subtitle="Aggiorna schema e impostazioni. Il salvataggio preserva l’identità del modulo."
@@ -144,6 +149,8 @@ function EditFormPageInner() {
         <Paper sx={{ p: 1.25 }}>
           <FormBuilder module={module} onChange={setModule} />
         </Paper>
+          </>
+        )}
       </AdminLayout>
     </ProtectedRoute>
   );

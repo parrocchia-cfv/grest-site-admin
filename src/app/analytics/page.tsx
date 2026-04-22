@@ -121,10 +121,11 @@ function buildWeekStats(module: Module, submissions: AdminSubmissionRow[]): Sede
     const sede = sedeRaw.trim();
     const waitWeeks = getWaitlistedWeeks(row);
     for (const weekId of cfg.weekFieldIds) {
-      if (!isWeekSelected(row[weekId], expected)) continue;
       const key = `${sede}::${weekId}`;
       const cur = counts.get(key) ?? { enrolled: 0, waitlisted: 0 };
-      cur.enrolled += 1;
+      if (isWeekSelected(row[weekId], expected)) {
+        cur.enrolled += 1;
+      }
       if (waitWeeks.has(weekId)) cur.waitlisted += 1;
       counts.set(key, cur);
     }
@@ -213,6 +214,8 @@ function childDisplayName(row: Record<string, unknown>): string {
 
 export default function AnalyticsPage() {
   const auth = useAuth();
+  const canViewAnalytics = Boolean(auth.user?.isSuperadmin || auth.user?.permissions.viewAnalytics);
+  const canManageSubmissions = Boolean(auth.user?.isSuperadmin || auth.user?.permissions.manageSubmissions);
   const authHandle = useMemo(
     () => ({
       getAccessToken: auth.getAccessToken,
@@ -504,6 +507,10 @@ export default function AnalyticsPage() {
   return (
     <ProtectedRoute>
       <AdminLayout>
+        {!canViewAnalytics ? (
+          <Alert severity="error">Non hai i permessi per visualizzare Analytics.</Alert>
+        ) : (
+          <>
         <PageHeader
           title="Analytics iscrizioni"
           subtitle="Vista strutturata iscritti, capienze settimane/gite ed export dati."
@@ -722,7 +729,12 @@ export default function AnalyticsPage() {
                         <TableCell>{email || '—'}</TableCell>
                         <TableCell align="right">
                           <Box sx={{ display: 'inline-flex', gap: 1 }}>
-                            <Button size="small" variant="outlined" onClick={() => openEditDialog(s)}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => openEditDialog(s)}
+                              disabled={!canManageSubmissions}
+                            >
                               Modifica inline
                             </Button>
                           {editUrl ? (
@@ -739,7 +751,7 @@ export default function AnalyticsPage() {
                               variant="outlined"
                               color="error"
                               onClick={() => handleDelete(s)}
-                              disabled={actionLoading}
+                              disabled={actionLoading || !canManageSubmissions}
                             >
                               Elimina
                             </Button>
@@ -866,6 +878,8 @@ export default function AnalyticsPage() {
             </Button>
           </DialogActions>
         </Dialog>
+          </>
+        )}
       </AdminLayout>
     </ProtectedRoute>
   );

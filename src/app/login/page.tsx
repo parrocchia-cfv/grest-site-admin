@@ -32,7 +32,7 @@ export default function LoginPage() {
       // Commit tokens before navigating: otherwise ProtectedRoute can render
       // with stale isAuthenticated (false) and redirect back to /login.
       flushSync(() => {
-        setTokens(res.accessToken, res.refreshToken, rememberMe);
+        setTokens(res.accessToken, res.refreshToken, rememberMe, res.user);
       });
       router.replace('/dashboard');
     } catch (err) {

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import type { AuthUserProfile } from '@/lib/api-client';
 import { refresh as apiRefresh } from '@/lib/api-client';
 
 const REFRESH_TOKEN_KEY = 'grest_admin_refresh_token';
@@ -9,16 +10,18 @@ const REMEMBER_ME_KEY = 'grest_admin_remember_me';
 interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
+  user: AuthUserProfile | null;
   rememberMe: boolean;
   isAuthLoading: boolean;
 }
 
 interface AuthContextValue extends AuthState {
   isAuthenticated: boolean;
-  setTokens: (access: string, refresh: string, rememberMe?: boolean) => void;
+  setTokens: (access: string, refresh: string, rememberMe?: boolean, user?: AuthUserProfile) => void;
   clearTokens: () => void;
   getAccessToken: () => string | null;
   getRefreshToken: () => string | null;
+  canAccessModule: (moduleId: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -55,15 +58,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(() => ({
     accessToken: null,
     refreshToken: loadStoredRefreshToken(),
+    user: null,
     rememberMe: loadRememberMeDefault(),
     isAuthLoading: true,
   }));
 
-  const setTokens = useCallback((access: string, refresh: string, rememberMe?: boolean) => {
+  const setTokens = useCallback((access: string, refresh: string, rememberMe?: boolean, user?: AuthUserProfile) => {
     const persistAsRemember = rememberMe ?? state.rememberMe;
     setState((prev) => ({
       accessToken: access,
       refreshToken: refresh,
+      user: user ?? prev.user,
       rememberMe: persistAsRemember,
       isAuthLoading: false,
     }));
@@ -74,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => ({
       accessToken: null,
       refreshToken: null,
+      user: null,
       rememberMe: prev.rememberMe,
       isAuthLoading: false,
     }));
@@ -99,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ...prev,
           accessToken: res.accessToken,
           refreshToken: res.refreshToken,
+          user: res.user,
           isAuthLoading: false,
         }));
         persistRefreshToken(res.refreshToken, state.rememberMe);
@@ -116,6 +123,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const getAccessToken = useCallback(() => state.accessToken, [state.accessToken]);
   const getRefreshToken = useCallback(() => state.refreshToken, [state.refreshToken]);
+  const canAccessModule = useCallback((moduleId: string) => {
+    if (!moduleId || !state.user) return false;
+    if (state.user.isSuperadmin) return true;
+    return state.user.moduleIds.includes(moduleId);
+  }, [state.user]);
 
   const value: AuthContextValue = {
     ...state,
@@ -124,6 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearTokens,
     getAccessToken,
     getRefreshToken,
+    canAccessModule,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

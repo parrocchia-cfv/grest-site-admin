@@ -10,16 +10,26 @@ import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import { useAuth } from '@/contexts/AuthContext';
 
-const nav = [
-  { label: 'Dashboard', href: '/dashboard' },
-  { label: 'Moduli', href: '/forms' },
-  { label: 'Analytics', href: '/analytics' },
-];
-
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { clearTokens } = useAuth();
+  const { clearTokens, user } = useAuth();
+
+  const nav = [
+    { label: 'Dashboard', href: '/dashboard', show: true },
+    { label: 'Moduli', href: '/forms', show: true },
+    {
+      label: 'Analytics',
+      href: '/analytics',
+      show: Boolean(user?.isSuperadmin || user?.permissions.viewAnalytics),
+    },
+    {
+      label: 'Utenti',
+      href: '/users',
+      show: Boolean(user?.isSuperadmin || user?.permissions.manageUsers),
+    },
+    { label: 'Profilo', href: '/profile', show: true },
+  ].filter((x) => x.show);
 
   function handleLogout() {
     clearTokens();

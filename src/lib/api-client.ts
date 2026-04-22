@@ -6,22 +6,39 @@ export interface LoginCredentials {
   password: string;
 }
 
+export interface UserPermissions {
+  manageUsers: boolean;
+  manageModules: boolean;
+  manageSubmissions: boolean;
+  viewAnalytics: boolean;
+}
+
+export interface AuthUserProfile {
+  id: number;
+  username: string;
+  isSuperadmin: boolean;
+  permissions: UserPermissions;
+  moduleIds: string[];
+}
+
 export interface LoginResponse {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
+  user: AuthUserProfile;
 }
 
 export interface RefreshResponse {
   accessToken: string;
   refreshToken: string;
   expiresIn?: number;
+  user: AuthUserProfile;
 }
 
 export type AuthHandle = {
   getAccessToken: () => string | null;
   getRefreshToken: () => string | null;
-  setTokens: (access: string, refresh: string) => void;
+  setTokens: (access: string, refresh: string, rememberMe?: boolean, user?: AuthUserProfile) => void;
   clearTokens: () => void;
 };
 
@@ -37,6 +54,14 @@ export interface AdminSubmissionPatchRequest {
   moduleId: string;
   responses: Record<string, unknown>;
   submittedAt?: string | null;
+}
+
+export interface AdminUserPayload {
+  username: string;
+  password: string;
+  isSuperadmin: boolean;
+  permissions: UserPermissions;
+  moduleIds: string[];
 }
 
 function redirectToLogin() {
@@ -83,7 +108,7 @@ async function fetchWithAuth(
     if (refreshToken) {
       try {
         const newTokens = await refresh(refreshToken);
-        auth.setTokens(newTokens.accessToken, newTokens.refreshToken);
+        auth.setTokens(newTokens.accessToken, newTokens.refreshToken, undefined, newTokens.user);
         const retryHeaders: HeadersInit = {
           ...(options.headers as Record<string, string>),
           Authorization: `Bearer ${newTokens.accessToken}`,
@@ -126,6 +151,12 @@ export async function refresh(refreshToken: string): Promise<RefreshResponse> {
   });
   if (!res.ok) throw new Error('Refresh failed');
   return res.json() as Promise<RefreshResponse>;
+}
+
+export async function getMe(auth: AuthHandle): Promise<AuthUserProfile> {
+  const res = await fetchWithAuth('/api/auth/me', { method: 'GET' }, auth);
+  if (!res.ok) throw new Error('Caricamento profilo utente fallito');
+  return res.json() as Promise<AuthUserProfile>;
 }
 
 // Modules API (require auth)
@@ -212,4 +243,81 @@ export async function downloadBackendLog(auth: AuthHandle): Promise<Blob> {
   const res = await fetchWithAuth('/api/admin/logs/download', { method: 'GET' }, auth);
   if (!res.ok) throw new Error(await readApiErrorMessage(res, 'Download log backend fallito'));
   return res.blob();
+}
+
+export async function listAdminUsers(auth: AuthHandle): Promise<AuthUserProfile[]> {
+  const res = await fetchWithAuth('/api/admin/users', { method: 'GET' }, auth);
+  if (!res.ok) throw new Error(await readApiErrorMessage(res, 'Caricamento utenti fallito'));
+  return res.json() as Promise<AuthUserProfile[]>;
+}
+
+export async function createAdminUser(payload: AdminUserPayload, auth: AuthHandle): Promise<AuthUserProfile> {
+  const res = await fetchWithAuth(
+    '/api/admin/users',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    auth
+  );
+  if (!res.ok) throw new Error(await readApiErrorMessage(res, 'Creazione utente fallita'));
+  return res.json() as Promise<AuthUserProfile>;
+}
+
+export async function updateAdminUser(
+  userId: number,
+  payload: Omit<AdminUserPayload, 'username' | 'password'>,
+  auth: AuthHandle
+): Promise<AuthUserProfile> {
+  const res = await fetchWithAuth(
+    `/api/admin/users/${userId}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    auth
+  );
+  if (!res.ok) throw new Error(await readApiErrorMessage(res, 'Aggiornamento utente fallito'));
+  return res.json() as Promise<AuthUserProfile>;
+}
+
+export async function deleteAdminUser(userId: number, auth: AuthHandle): Promise<void> {
+  const res = await fetchWithAuth(`/api/admin/users/${userId}`, { method: 'DELETE' }, auth);
+  if (!res.ok) throw new Error(await readApiErrorMessage(res, 'Eliminazione utente fallita'));
+}
+
+export async function resetAdminUserPassword(
+  userId: number,
+  newPassword: string,
+  auth: AuthHandle
+): Promise<void> {
+  const res = await fetchWithAuth(
+    `/api/admin/users/${userId}/reset-password`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPassword }),
+    },
+    auth
+  );
+  if (!res.ok) throw new Error(await readApiErrorMessage(res, 'Reset password fallito'));
+}
+
+export async function changeMyPassword(
+  currentPassword: string,
+  newPassword: string,
+  auth: AuthHandle
+): Promise<void> {
+  const res = await fetchWithAuth(
+    '/api/admin/users/me/change-password',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    },
+    auth
+  );
+  if (!res.ok) throw new Error(await readApiErrorMessage(res, 'Cambio password fallito'));
 }

@@ -30,6 +30,7 @@ type ModuleRow = Module;
 
 export default function FormsListPage() {
   const auth = useAuth();
+  const canManageModules = Boolean(auth.user?.isSuperadmin || auth.user?.permissions.manageModules);
   const [list, setList] = useState<ModuleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,9 +111,11 @@ export default function FormsListPage() {
               >
                 {downloadBusy ? 'Scarico log…' : 'Scarica log backend'}
               </Button>
-              <Button component={Link} href="/forms/new" variant="contained">
-                Nuovo modulo
-              </Button>
+              {canManageModules && (
+                <Button component={Link} href="/forms/new" variant="contained">
+                  Nuovo modulo
+                </Button>
+              )}
             </>
           }
         />
@@ -157,9 +160,11 @@ export default function FormsListPage() {
                           Copia link
                         </Button>
                       </Tooltip>
-                      <Button component={Link} href={`/forms/edit?id=${encodeURIComponent(m.id)}`} size="small">
-                        Modifica
-                      </Button>
+                      {canManageModules && (
+                        <Button component={Link} href={`/forms/edit?id=${encodeURIComponent(m.id)}`} size="small">
+                          Modifica
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

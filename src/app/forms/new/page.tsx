@@ -25,6 +25,7 @@ const initialModule: Module = (() => {
 export default function NewFormPage() {
   const router = useRouter();
   const auth = useAuth();
+  const canManageModules = Boolean(auth.user?.isSuperadmin || auth.user?.permissions.manageModules);
   const [module, setModule] = useState<Module>(initialModule);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +66,10 @@ export default function NewFormPage() {
   return (
     <ProtectedRoute>
       <AdminLayout>
+        {!canManageModules ? (
+          <Alert severity="error">Non hai i permessi per creare/modificare moduli.</Alert>
+        ) : (
+          <>
         <PageHeader
           title="Nuovo modulo"
           subtitle="Configura schema, opzioni email e capienze prima del primo salvataggio."
@@ -78,6 +83,8 @@ export default function NewFormPage() {
         <Paper sx={{ p: 1.25 }}>
           <FormBuilder module={module} onChange={setModule} />
         </Paper>
+          </>
+        )}
       </AdminLayout>
     </ProtectedRoute>
   );
