@@ -46,6 +46,8 @@ export type NoticeVariant = 'info' | 'warning' | 'error';
 export interface FieldOption {
   value: string;
   label: I18n;
+  /** Flag statico: se false l'opzione risulta non selezionabile nel public. */
+  enabled?: boolean;
   /** Condizione opzionale per abilitare la singola opzione (es. radio). */
   enabledIf?: Condition;
 }

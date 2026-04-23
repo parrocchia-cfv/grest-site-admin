@@ -391,6 +391,17 @@ export function PropertyPanel({
                       Rimuovi
                     </Button>
                   </Box>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={opt.enabled !== false}
+                        onChange={(e) =>
+                          updateOptionAt(idx, (o) => ({ ...o, enabled: e.target.checked }))
+                        }
+                      />
+                    }
+                    label="Opzione attiva"
+                  />
                   {(field.type === 'radio' || field.type === 'checkbox-group') && (
                     <Box
                       sx={{
@@ -425,7 +436,7 @@ export function PropertyPanel({
                     ...f,
                     options: [
                       ...ensureOptions(f),
-                      { value: '', label: { it: '' } },
+                      { value: '', label: { it: '' }, enabled: true },
                     ],
                   }))
                 }
