@@ -20,6 +20,7 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
+import Paper from '@mui/material/Paper';
 import { VALIDATION_TYPES } from '@/lib/validation-types';
 import { FIELD_TYPES, formatFieldTypeLabel } from '@/lib/field-types';
 import { normalizeFieldForType, typeUsesPlaceholder, typeUsesValidation } from '@/lib/field-normalize';
@@ -369,21 +370,16 @@ export function PropertyPanel({
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {ensureOptions(field).map((opt, idx) => (
-                <Box
+                <Paper
                   key={`opt-${idx}`}
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 1,
-                    p: 1.25,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1.5,
-                    backgroundColor: 'background.paper',
-                  }}
+                  variant="outlined"
+                  sx={{ p: 1.25, display: 'flex', flexDirection: 'column', gap: 1 }}
                 >
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="subtitle2" sx={{ lineHeight: 1.2 }}>
                     Opzione #{idx + 1}
+                    <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                      ({opt.value || 'valore non impostato'})
+                    </Typography>
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <TextField
@@ -423,20 +419,21 @@ export function PropertyPanel({
                         }
                       />
                     }
-                    label={`Opzione attiva (${opt.value || 'valore non impostato'})`}
+                    label="Flag: questa opzione è attiva e selezionabile nel public"
                   />
                   {(field.type === 'radio' || field.type === 'checkbox-group') && (
                     <Box
                       sx={{
-                        pl: 1,
-                        pr: 1,
+                        p: 1,
                         pb: 1,
                         borderLeft: '2px solid',
                         borderColor: 'divider',
+                        borderRadius: 1,
+                        backgroundColor: 'action.hover',
                       }}
                     >
                       <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-                        Abilitazione opzione ({field.type}) con enabledIf
+                        Regola enabledIf per questa opzione (non per quelle sopra/sotto)
                       </Typography>
                       <ConditionForm
                         value={opt.enabledIf}
@@ -450,7 +447,7 @@ export function PropertyPanel({
                       />
                     </Box>
                   )}
-                </Box>
+                </Paper>
               ))}
               <Button
                 size="small"
