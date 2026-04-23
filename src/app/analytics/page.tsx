@@ -88,6 +88,7 @@ const SEDE_LABELS: Record<string, string> = {
   patro: 'Patronato',
   patronato: 'Patronato',
 };
+const TRIP_EXPORT_SLOTS = 3;
 
 function pct(current: number, limit: number): number {
   if (!Number.isFinite(limit) || limit <= 0) return 0;
@@ -363,6 +364,49 @@ function toHumanExportValue(
   return raw == null ? '' : String(raw);
 }
 
+function tripSelectionsForExport(
+  submission: AdminSubmissionRow,
+  module: Module | null,
+  fieldIndex: Map<string, { label: string; type: string; options: { value: string; label: string }[] }>
+): string[] {
+  const tripCfg = module?.tripCapacity;
+  if (!tripCfg?.enabled) return [];
+  const tripFieldOrder = Object.keys(tripCfg.limitsByField);
+  const fieldPos = new Map<string, number>();
+  tripFieldOrder.forEach((fid, idx) => fieldPos.set(fid, idx));
+
+  const out: { fieldOrder: number; optionOrder: number; text: string }[] = [];
+  const responses = submission.responses ?? {};
+
+  for (const [key, raw] of Object.entries(responses)) {
+    const { baseId } = parseFieldKey(key);
+    const fo = fieldPos.get(baseId);
+    if (fo === undefined) continue;
+    const meta = fieldIndex.get(baseId);
+    const selected = Array.isArray(raw)
+      ? raw.filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+      : typeof raw === 'string' && raw.trim()
+        ? [raw.trim()]
+        : [];
+    if (selected.length === 0) continue;
+
+    const optionPos = new Map<string, number>();
+    (meta?.options ?? []).forEach((o, idx) => optionPos.set(o.value, idx));
+    const fieldLabel = meta?.label || baseId;
+    for (const v of selected) {
+      const optionLabel = meta?.options.find((o) => o.value === v)?.label || v;
+      out.push({
+        fieldOrder: fo,
+        optionOrder: optionPos.get(v) ?? 9999,
+        text: `${fieldLabel}: ${optionLabel}`,
+      });
+    }
+  }
+
+  out.sort((a, b) => a.fieldOrder - b.fieldOrder || a.optionOrder - b.optionOrder || a.text.localeCompare(b.text, 'it'));
+  return out.map((x) => x.text);
+}
+
 export default function AnalyticsPage() {
   const auth = useAuth();
   const canViewAnalytics = Boolean(auth.user?.isSuperadmin || auth.user?.permissions.viewAnalytics);
@@ -545,6 +589,7 @@ export default function AnalyticsPage() {
   const exportColumns = useMemo<ExportColumn[]>(() => {
     const fieldIndex = buildFieldIndex(selectedModule);
     const expectedWeekYes = selectedModule?.enrollmentCapacity?.weekParticipationValue?.trim() || 'si';
+    const tripFieldIds = new Set(Object.keys(selectedModule?.tripCapacity?.limitsByField ?? {}));
     const out: ExportColumn[] = [
       {
         id: 'submittedAt',
@@ -558,6 +603,7 @@ export default function AnalyticsPage() {
       const { baseId, repeatIndex } = parseFieldKey(key);
       const meta = fieldIndex.get(baseId);
       if (!meta) continue;
+      if (tripFieldIds.has(baseId)) continue;
       const baseRank = rankExportColumn(key, selectedModule, fieldIndex);
       const baseLabel = withRepeatSuffix(meta.label, repeatIndex);
 
@@ -602,6 +648,18 @@ export default function AnalyticsPage() {
           const row = s.responses ?? {};
           const v = row[key];
           return toHumanExportValue(key, v, meta);
+        },
+      });
+    }
+
+    for (let i = 0; i < TRIP_EXPORT_SLOTS; i++) {
+      out.push({
+        id: `trip_slot_${i + 1}`,
+        header: i === 0 ? 'Prima uscita' : i === 1 ? 'Seconda uscita' : 'Terza uscita',
+        rank: [4, i, `trip_slot_${i + 1}`],
+        value: (s) => {
+          const trips = tripSelectionsForExport(s, selectedModule, fieldIndex);
+          return trips[i] ?? '';
         },
       });
     }
