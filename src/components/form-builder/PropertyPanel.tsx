@@ -322,29 +322,37 @@ export function PropertyPanel({
           </Box>
         )}
 
-        <Typography variant="subtitle2" sx={{ mt: 2 }}>
-          showIf
-        </Typography>
-        <ConditionForm
-          value={field.showIf}
-          selfFieldId={field.id}
-          fieldIds={allFieldIds.filter((id) => id !== field.id)}
-          fieldsById={fieldsById}
-          onChange={(cond) => updateCondition('showIf', cond)}
-        />
+        <Box sx={{ mt: 2, p: 1.25, border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
+          <Typography variant="subtitle2">Visibilità campo (showIf)</Typography>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+            Regola che controlla quando questo campo viene mostrato.
+          </Typography>
+          <ConditionForm
+            value={field.showIf}
+            selfFieldId={field.id}
+            fieldIds={allFieldIds.filter((id) => id !== field.id)}
+            fieldsById={fieldsById}
+            targetLabel={`Campo "${field.id}"`}
+            onChange={(cond) => updateCondition('showIf', cond)}
+          />
+        </Box>
 
         {field.type !== 'notice' && (
           <>
-            <Typography variant="subtitle2" sx={{ mt: 2 }}>
-              requiredIf
-            </Typography>
-            <ConditionForm
-              value={field.requiredIf}
-              selfFieldId={field.id}
-              fieldIds={allFieldIds.filter((id) => id !== field.id)}
-              fieldsById={fieldsById}
-              onChange={(cond) => updateCondition('requiredIf', cond)}
-            />
+            <Box sx={{ mt: 2, p: 1.25, border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}>
+              <Typography variant="subtitle2">Obbligatorietà condizionata (requiredIf)</Typography>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                Regola che rende obbligatorio questo campo solo in certi casi.
+              </Typography>
+              <ConditionForm
+                value={field.requiredIf}
+                selfFieldId={field.id}
+                fieldIds={allFieldIds.filter((id) => id !== field.id)}
+                fieldsById={fieldsById}
+                targetLabel={`Campo "${field.id}"`}
+                onChange={(cond) => updateCondition('requiredIf', cond)}
+              />
+            </Box>
           </>
         )}
 
@@ -361,7 +369,22 @@ export function PropertyPanel({
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {ensureOptions(field).map((opt, idx) => (
-                <Box key={`opt-${idx}`} sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box
+                  key={`opt-${idx}`}
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1,
+                    p: 1.25,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1.5,
+                    backgroundColor: 'background.paper',
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary">
+                    Opzione #{idx + 1}
+                  </Typography>
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <TextField
                       size="small"
@@ -400,7 +423,7 @@ export function PropertyPanel({
                         }
                       />
                     }
-                    label="Opzione attiva"
+                    label={`Opzione attiva (${opt.value || 'valore non impostato'})`}
                   />
                   {(field.type === 'radio' || field.type === 'checkbox-group') && (
                     <Box
@@ -420,6 +443,7 @@ export function PropertyPanel({
                         selfFieldId={field.id}
                         fieldIds={allFieldIds.filter((id) => id !== field.id)}
                         fieldsById={fieldsById}
+                        targetLabel={`Opzione "${opt.value || `#${idx + 1}`}" del campo "${field.id}"`}
                         onChange={(cond) =>
                           updateOptionAt(idx, (o) => ({ ...o, enabledIf: cond }))
                         }
@@ -705,12 +729,14 @@ function ConditionForm({
   selfFieldId,
   fieldIds,
   fieldsById,
+  targetLabel,
   onChange,
 }: {
   value: Condition | undefined;
   selfFieldId: string;
   fieldIds: string[];
   fieldsById: Map<string, Field>;
+  targetLabel?: string;
   onChange: (c: Condition | undefined) => void;
 }) {
   if (fieldIds.length === 0) {
@@ -728,6 +754,11 @@ function ConditionForm({
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      {targetLabel && (
+        <Typography variant="caption" color="text.secondary">
+          Riferito a: {targetLabel}
+        </Typography>
+      )}
       <FormControl size="small" fullWidth>
         <InputLabel>Campo riferimento</InputLabel>
         <Select
