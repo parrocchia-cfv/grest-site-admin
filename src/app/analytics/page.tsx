@@ -32,11 +32,15 @@ import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import Chip from '@mui/material/Chip';
 import LinearProgress from '@mui/material/LinearProgress';
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
 import { buildPublicEditSubmissionUrl } from '@/lib/public-form-url';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 type SedeWeekStats = {
   sede: string;
@@ -745,272 +749,280 @@ export default function AnalyticsPage() {
           </Paper>
         </Box>
 
-        <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-          <Typography variant="h6" sx={{ mb: 1 }}>
-            Settimane per sede
-          </Typography>
-          {weekStats.length === 0 ? (
-            <Typography color="text.secondary">
-              Nessuna configurazione `enrollmentCapacity` attiva per questo modulo.
-            </Typography>
-          ) : (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Settimana (fieldId)</TableCell>
-                    {weekPivot.sedi.map((sede) => (
-                      <TableCell key={sede} align="center">
-                        {sede}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {weekPivot.weeks.map((weekId) => {
-                    return (
-                      <TableRow key={weekId}>
-                        <TableCell>{weekId}</TableCell>
-                        {weekPivot.sedi.map((sede) => {
-                          const cell = weekPivot.cells.get(weekId)?.get(sede);
-                          if (!cell) return <TableCell key={`${weekId}-${sede}`} align="center">—</TableCell>;
-                          const text = `${cell.enrolled} di ${cell.limit}`;
-                          const progress = pct(cell.enrolled, cell.limit);
-                          return (
-                            <TableCell key={`${weekId}-${sede}`} align="center">
-                              {text}
-                              <LinearProgress
-                                variant="determinate"
-                                value={progress}
-                                sx={{ mt: 0.6, height: 6, borderRadius: 99 }}
-                              />
-                              {cell.waitlisted > 0 && (
-                                <Typography variant="caption" color="warning.main" display="block">
-                                  attesa: {cell.waitlisted}
-                                </Typography>
-                              )}
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </Paper>
-
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="h6" sx={{ mb: 1 }}>
-            Gite / uscite
-          </Typography>
-          {tripStats.length === 0 ? (
-            <Typography color="text.secondary">
-              Nessuna configurazione `tripCapacity` attiva per questo modulo.
-            </Typography>
-          ) : (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Campo gita (fieldId)</TableCell>
-                    <TableCell>Opzione</TableCell>
-                    <TableCell align="right">Iscritti / Max</TableCell>
-                    <TableCell>Utilizzo</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {tripStats.map((r) => (
-                    <TableRow key={`${r.fieldId}-${r.optionValue}`}>
-                      <TableCell>{r.fieldId}</TableCell>
-                      <TableCell>
-                        {r.optionLabel} <Typography component="span" color="text.secondary">({r.optionValue})</Typography>
-                      </TableCell>
-                      <TableCell align="right">{`${r.enrolled} di ${r.limit}`}</TableCell>
-                      <TableCell sx={{ minWidth: 180 }}>
-                        <LinearProgress
-                          variant="determinate"
-                          value={pct(r.enrolled, r.limit)}
-                          sx={{ height: 8, borderRadius: 99 }}
-                        />
-                      </TableCell>
+        <Accordion defaultExpanded sx={{ mb: 2 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="h6">Settimane per sede</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            {weekStats.length === 0 ? (
+              <Typography color="text.secondary">
+                Nessuna configurazione `enrollmentCapacity` attiva per questo modulo.
+              </Typography>
+            ) : (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Settimana (fieldId)</TableCell>
+                      {weekPivot.sedi.map((sede) => (
+                        <TableCell key={sede} align="center">
+                          {sede}
+                        </TableCell>
+                      ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </Paper>
+                  </TableHead>
+                  <TableBody>
+                    {weekPivot.weeks.map((weekId) => {
+                      return (
+                        <TableRow key={weekId}>
+                          <TableCell>{weekId}</TableCell>
+                          {weekPivot.sedi.map((sede) => {
+                            const cell = weekPivot.cells.get(weekId)?.get(sede);
+                            if (!cell) return <TableCell key={`${weekId}-${sede}`} align="center">—</TableCell>;
+                            const text = `${cell.enrolled} di ${cell.limit}`;
+                            const progress = pct(cell.enrolled, cell.limit);
+                            return (
+                              <TableCell key={`${weekId}-${sede}`} align="center">
+                                {text}
+                                <LinearProgress
+                                  variant="determinate"
+                                  value={progress}
+                                  sx={{ mt: 0.6, height: 6, borderRadius: 99 }}
+                                />
+                                {cell.waitlisted > 0 && (
+                                  <Typography variant="caption" color="warning.main" display="block">
+                                    attesa: {cell.waitlisted}
+                                  </Typography>
+                                )}
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </AccordionDetails>
+        </Accordion>
 
-        <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
-          <Typography variant="h6" sx={{ mb: 1 }}>
-            Gestione iscrizioni
-          </Typography>
-          <Typography color="text.secondary" sx={{ mb: 1 }}>
-            Ricerca rapida sulle iscrizioni filtrate con accesso alla modifica sul sito pubblico.
-          </Typography>
-          {filteredSubmissions.length === 0 ? (
-            <Typography color="text.secondary">Nessuna iscrizione trovata con i filtri correnti.</Typography>
-          ) : (
-            <TableContainer sx={{ mb: 2 }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Data invio</TableCell>
-                    <TableCell>ID gruppo</TableCell>
-                    <TableCell>Nome/Cognome</TableCell>
-                    <TableCell>Email</TableCell>
-                    <TableCell align="right">Azioni</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredSubmissions.slice(0, 60).map((s) => {
-                    const r = s.responses ?? {};
-                    const nome = typeof r.nome === 'string' ? r.nome : '';
-                    const cognome = typeof r.cognome === 'string' ? r.cognome : '';
-                    const email = typeof r.email === 'string' ? r.email : '';
-                    const editToken = s.submissionGroupId || s.id;
-                    const editUrl = buildPublicEditSubmissionUrl(editToken);
-                    return (
-                      <TableRow key={s.id}>
-                        <TableCell>{formatSubmittedAt(s.submittedAt)}</TableCell>
-                        <TableCell>{s.submissionGroupId ?? s.id}</TableCell>
-                        <TableCell>{`${nome} ${cognome}`.trim() || '—'}</TableCell>
-                        <TableCell>{email || '—'}</TableCell>
-                        <TableCell align="right">
-                          <Box sx={{ display: 'inline-flex', gap: 1 }}>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              onClick={() => openEditDialog(s)}
-                              disabled={!canManageSubmissions}
-                            >
-                              Modifica inline
-                            </Button>
-                          {editUrl ? (
-                            <Button size="small" variant="outlined" href={editUrl} target="_blank" rel="noreferrer">
-                              Modifica su public
-                            </Button>
-                          ) : (
-                            <Button size="small" variant="outlined" disabled>
-                              Modifica su public
-                            </Button>
-                          )}
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              color="error"
-                              onClick={() => handleDelete(s)}
-                              disabled={actionLoading || !canManageSubmissions}
-                            >
-                              Elimina
-                            </Button>
-                          </Box>
+        <Accordion defaultExpanded sx={{ mb: 2 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="h6">Gite / uscite</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            {tripStats.length === 0 ? (
+              <Typography color="text.secondary">
+                Nessuna configurazione `tripCapacity` attiva per questo modulo.
+              </Typography>
+            ) : (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Campo gita (fieldId)</TableCell>
+                      <TableCell>Opzione</TableCell>
+                      <TableCell align="right">Iscritti / Max</TableCell>
+                      <TableCell>Utilizzo</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {tripStats.map((r) => (
+                      <TableRow key={`${r.fieldId}-${r.optionValue}`}>
+                        <TableCell>{r.fieldId}</TableCell>
+                        <TableCell>
+                          {r.optionLabel} <Typography component="span" color="text.secondary">({r.optionValue})</Typography>
+                        </TableCell>
+                        <TableCell align="right">{`${r.enrolled} di ${r.limit}`}</TableCell>
+                        <TableCell sx={{ minWidth: 180 }}>
+                          <LinearProgress
+                            variant="determinate"
+                            value={pct(r.enrolled, r.limit)}
+                            sx={{ height: 8, borderRadius: 99 }}
+                          />
                         </TableCell>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-          <Typography variant="h6" sx={{ mb: 1 }}>
-            Export iscrizioni (Excel)
-          </Typography>
-          <Typography color="text.secondary" sx={{ mb: 1 }}>
-            Esporta file CSV compatibile Excel: una riga = un bambino iscritto, con colonne ordinate in modo
-            operativo (anagrafica, sede, settimane, gite, poi il resto). Nessun metadato tecnico (id, guid,
-            chiavi `_...`).
-          </Typography>
-          <Button
-            variant="contained"
-            disabled={filteredSubmissions.length === 0}
-            onClick={exportChildrenCsv}
-          >
-            Esporta Excel (CSV) filtrato
-          </Button>
-        </Paper>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </AccordionDetails>
+        </Accordion>
 
-        <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
-          <Typography variant="h6" sx={{ mb: 1 }}>
-            Lista d’attesa (dettaglio)
-          </Typography>
-          {!waitlistConfig?.enabled ? (
-            <Typography color="text.secondary">
-              Abilita `enrollmentCapacity` per usare la lista d’attesa per sede/settimana.
+        <Accordion defaultExpanded sx={{ mb: 2 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="h6">Gestione iscrizioni</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Typography color="text.secondary" sx={{ mb: 1 }}>
+              Ricerca rapida sulle iscrizioni filtrate con accesso alla modifica sul sito pubblico.
             </Typography>
-          ) : (
-            <>
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                  gap: 1.5,
-                  mb: 1.5,
-                }}
-              >
-                <FormControl size="small">
-                  <InputLabel id="waitlist-sede-label">Sede</InputLabel>
-                  <Select
-                    labelId="waitlist-sede-label"
-                    value={waitlistSedeFilter}
-                    label="Sede"
-                    onChange={(e) => setWaitlistSedeFilter(String(e.target.value))}
-                  >
-                    {waitlistSediOptions.map((sede) => (
-                      <MenuItem key={sede} value={sede}>
-                        {sede}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <FormControl size="small">
-                  <InputLabel id="waitlist-week-label">Settimana</InputLabel>
-                  <Select
-                    labelId="waitlist-week-label"
-                    value={waitlistWeekFilter}
-                    label="Settimana"
-                    onChange={(e) => setWaitlistWeekFilter(String(e.target.value))}
-                  >
-                    {waitlistWeekOptions.map((weekId) => (
-                      <MenuItem key={weekId} value={weekId}>
-                        {fieldLabelById(selectedModule!, weekId)}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-
-              {waitlistRows.length === 0 ? (
-                <Typography color="text.secondary">
-                  Nessun bambino in lista d’attesa per i filtri correnti.
-                </Typography>
-              ) : (
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Cognome nome</TableCell>
-                        <TableCell>Data/ora compilazione</TableCell>
-                        <TableCell>ID submission</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {waitlistRows.map((r) => (
-                        <TableRow key={r.submissionId}>
-                          <TableCell>{r.name}</TableCell>
-                          <TableCell>{formatSubmittedAt(r.submittedAt)}</TableCell>
-                          <TableCell>{r.submissionId}</TableCell>
+            {filteredSubmissions.length === 0 ? (
+              <Typography color="text.secondary">Nessuna iscrizione trovata con i filtri correnti.</Typography>
+            ) : (
+              <TableContainer sx={{ mb: 2 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Data invio</TableCell>
+                      <TableCell>ID gruppo</TableCell>
+                      <TableCell>Nome/Cognome</TableCell>
+                      <TableCell>Email</TableCell>
+                      <TableCell align="right">Azioni</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredSubmissions.slice(0, 60).map((s) => {
+                      const r = s.responses ?? {};
+                      const nome = typeof r.nome === 'string' ? r.nome : '';
+                      const cognome = typeof r.cognome === 'string' ? r.cognome : '';
+                      const email = typeof r.email === 'string' ? r.email : '';
+                      const editToken = s.submissionGroupId || s.id;
+                      const editUrl = buildPublicEditSubmissionUrl(editToken);
+                      return (
+                        <TableRow key={s.id}>
+                          <TableCell>{formatSubmittedAt(s.submittedAt)}</TableCell>
+                          <TableCell>{s.submissionGroupId ?? s.id}</TableCell>
+                          <TableCell>{`${nome} ${cognome}`.trim() || '—'}</TableCell>
+                          <TableCell>{email || '—'}</TableCell>
+                          <TableCell align="right">
+                            <Box sx={{ display: 'inline-flex', gap: 1 }}>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => openEditDialog(s)}
+                                disabled={!canManageSubmissions}
+                              >
+                                Modifica inline
+                              </Button>
+                            {editUrl ? (
+                              <Button size="small" variant="outlined" href={editUrl} target="_blank" rel="noreferrer">
+                                Modifica su public
+                              </Button>
+                            ) : (
+                              <Button size="small" variant="outlined" disabled>
+                                Modifica su public
+                              </Button>
+                            )}
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="error"
+                                onClick={() => handleDelete(s)}
+                                disabled={actionLoading || !canManageSubmissions}
+                              >
+                                Elimina
+                              </Button>
+                            </Box>
+                          </TableCell>
                         </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+            <Typography variant="h6" sx={{ mb: 1 }}>
+              Export iscrizioni (Excel)
+            </Typography>
+            <Typography color="text.secondary" sx={{ mb: 1 }}>
+              Esporta file CSV compatibile Excel: una riga = un bambino iscritto, con colonne ordinate in modo
+              operativo (anagrafica, sede, settimane, gite, poi il resto). Nessun metadato tecnico (id, guid,
+              chiavi `_...`).
+            </Typography>
+            <Button
+              variant="contained"
+              disabled={filteredSubmissions.length === 0}
+              onClick={exportChildrenCsv}
+            >
+              Esporta Excel (CSV) filtrato
+            </Button>
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion defaultExpanded>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="h6">Lista d’attesa (dettaglio)</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            {!waitlistConfig?.enabled ? (
+              <Typography color="text.secondary">
+                Abilita `enrollmentCapacity` per usare la lista d’attesa per sede/settimana.
+              </Typography>
+            ) : (
+              <>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                    gap: 1.5,
+                    mb: 1.5,
+                  }}
+                >
+                  <FormControl size="small">
+                    <InputLabel id="waitlist-sede-label">Sede</InputLabel>
+                    <Select
+                      labelId="waitlist-sede-label"
+                      value={waitlistSedeFilter}
+                      label="Sede"
+                      onChange={(e) => setWaitlistSedeFilter(String(e.target.value))}
+                    >
+                      {waitlistSediOptions.map((sede) => (
+                        <MenuItem key={sede} value={sede}>
+                          {sede}
+                        </MenuItem>
                       ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              )}
-            </>
-          )}
-        </Paper>
+                    </Select>
+                  </FormControl>
+                  <FormControl size="small">
+                    <InputLabel id="waitlist-week-label">Settimana</InputLabel>
+                    <Select
+                      labelId="waitlist-week-label"
+                      value={waitlistWeekFilter}
+                      label="Settimana"
+                      onChange={(e) => setWaitlistWeekFilter(String(e.target.value))}
+                    >
+                      {waitlistWeekOptions.map((weekId) => (
+                        <MenuItem key={weekId} value={weekId}>
+                          {fieldLabelById(selectedModule!, weekId)}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Box>
+
+                {waitlistRows.length === 0 ? (
+                  <Typography color="text.secondary">
+                    Nessun bambino in lista d’attesa per i filtri correnti.
+                  </Typography>
+                ) : (
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Cognome nome</TableCell>
+                          <TableCell>Data/ora compilazione</TableCell>
+                          <TableCell>ID submission</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {waitlistRows.map((r) => (
+                          <TableRow key={r.submissionId}>
+                            <TableCell>{r.name}</TableCell>
+                            <TableCell>{formatSubmittedAt(r.submittedAt)}</TableCell>
+                            <TableCell>{r.submissionId}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </>
+            )}
+          </AccordionDetails>
+        </Accordion>
         <Dialog open={!!editTarget} onClose={() => (actionLoading ? null : setEditTarget(null))} maxWidth="md" fullWidth>
           <DialogTitle>Modifica iscrizione (JSON risposte)</DialogTitle>
           <DialogContent>

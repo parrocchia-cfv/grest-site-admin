@@ -3,11 +3,11 @@
   "/analytics/page": "app/analytics/page.js",
   "/forms/new/page": "app/forms/new/page.js",
   "/forms/edit/page": "app/forms/edit/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/forms/page": "app/forms/page.js",
   "/login/page": "app/login/page.js",
+  "/forms/page": "app/forms/page.js",
+  "/profile/page": "app/profile/page.js",
+  "/users/page": "app/users/page.js",
   "/icon.svg/route": "app/icon.svg/route.js",
   "/page": "app/page.js",
-  "/profile/page": "app/profile/page.js",
-  "/users/page": "app/users/page.js"
+  "/dashboard/page": "app/dashboard/page.js"
 }
