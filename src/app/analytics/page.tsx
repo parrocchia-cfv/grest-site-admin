@@ -76,6 +76,19 @@ const PRIMARY_FIELDS_ORDER = [
   'telefono_genitore',
 ] as const;
 
+const SEDE_LABELS: Record<string, string> = {
+  post: 'Postumia',
+  postumia: 'Postumia',
+  salva: 'Salvarosa',
+  salvarosa: 'Salvarosa',
+  villa: 'Villarazzo',
+  villarazzo: 'Villarazzo',
+  bordi: 'Bordignon',
+  bordignon: 'Bordignon',
+  patro: 'Patronato',
+  patronato: 'Patronato',
+};
+
 function pct(current: number, limit: number): number {
   if (!Number.isFinite(limit) || limit <= 0) return 0;
   return Math.max(0, Math.min(100, (current / limit) * 100));
@@ -245,6 +258,25 @@ function withRepeatSuffix(label: string, repeatIndex: number | null): string {
   return `${label} #${repeatIndex + 1}`;
 }
 
+function shortenHeader(label: string, maxLen = 38): string {
+  const clean = label.replace(/\s+/g, ' ').trim();
+  if (clean.length <= maxLen) return clean;
+  return `${clean.slice(0, Math.max(1, maxLen - 1)).trimEnd()}…`;
+}
+
+function mapSedeLabel(value: string): string {
+  const key = value.trim().toLowerCase();
+  return SEDE_LABELS[key] ?? value;
+}
+
+function mapClassLabel(value: string): string {
+  const trimmed = value.trim();
+  const compact = trimmed.replace(/\s+/g, '').toLowerCase();
+  const m = compact.match(/^(\d+)([em])$/);
+  if (!m) return value;
+  return `${m[1]} ${m[2] === 'e' ? 'Elementare' : 'Media'}`;
+}
+
 function buildFieldIndex(
   module: Module | null
 ): Map<string, { label: string; type: string; options: { value: string; label: string }[] }> {
@@ -299,6 +331,37 @@ type ExportColumn = {
   rank: [number, number, string];
   value: (submission: AdminSubmissionRow) => string;
 };
+
+function toHumanExportValue(
+  key: string,
+  raw: unknown,
+  fieldMeta: { type: string; options: { value: string; label: string }[] } | undefined
+): string {
+  const { baseId } = parseFieldKey(key);
+  const isSedeField = baseId.toLowerCase().includes('sede');
+  const isClassField = baseId.toLowerCase().includes('classe') || baseId.toLowerCase().includes('class');
+
+  const mapScalar = (input: string): string => {
+    let out = input;
+    if (fieldMeta && (fieldMeta.type === 'select' || fieldMeta.type === 'radio')) {
+      const opt = fieldMeta.options.find((o) => o.value === input);
+      out = opt?.label ?? out;
+    }
+    if (isSedeField) out = mapSedeLabel(out);
+    if (isClassField) out = mapClassLabel(out);
+    return out;
+  };
+
+  if (Array.isArray(raw)) {
+    return raw
+      .filter((v): v is string => typeof v === 'string')
+      .map((v) => mapScalar(v))
+      .join(', ');
+  }
+  if (typeof raw === 'string') return mapScalar(raw);
+  if (typeof raw === 'object' && raw !== null) return JSON.stringify(raw);
+  return raw == null ? '' : String(raw);
+}
 
 export default function AnalyticsPage() {
   const auth = useAuth();
@@ -503,7 +566,7 @@ export default function AnalyticsPage() {
         meta.options.forEach((opt, idx) => {
           out.push({
             id: `${key}::opt::${opt.value}`,
-            header: `${baseLabel} - ${opt.label}`,
+            header: shortenHeader(`${baseLabel} · ${opt.label}`),
             rank: [baseRank[0], baseRank[1], `${baseRank[2]}::${String(idx).padStart(4, '0')}`],
             value: (s) => {
               const row = s.responses ?? {};
@@ -521,7 +584,7 @@ export default function AnalyticsPage() {
       if (isWeekField) {
         out.push({
           id: key,
-          header: baseLabel,
+          header: shortenHeader(baseLabel),
           rank: baseRank,
           value: (s) => {
             const row = s.responses ?? {};
@@ -533,14 +596,12 @@ export default function AnalyticsPage() {
 
       out.push({
         id: key,
-        header: baseLabel,
+        header: shortenHeader(baseLabel),
         rank: baseRank,
         value: (s) => {
           const row = s.responses ?? {};
           const v = row[key];
-          if (Array.isArray(v)) return v.join(', ');
-          if (typeof v === 'object' && v !== null) return JSON.stringify(v);
-          return v == null ? '' : String(v);
+          return toHumanExportValue(key, v, meta);
         },
       });
     }
@@ -712,6 +773,15 @@ export default function AnalyticsPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Es. mario, rossi, 1e, 2026-06, @mail..."
           />
+          <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              variant="contained"
+              disabled={filteredSubmissions.length === 0}
+              onClick={exportChildrenCsv}
+            >
+              Esporta Excel (CSV) filtrato
+            </Button>
+          </Box>
         </Paper>
 
         <Box
@@ -924,21 +994,9 @@ export default function AnalyticsPage() {
                 </Table>
               </TableContainer>
             )}
-            <Typography variant="h6" sx={{ mb: 1 }}>
-              Export iscrizioni (Excel)
-            </Typography>
             <Typography color="text.secondary" sx={{ mb: 1 }}>
-              Esporta file CSV compatibile Excel: una riga = un bambino iscritto, con colonne ordinate in modo
-              operativo (anagrafica, sede, settimane, gite, poi il resto). Nessun metadato tecnico (id, guid,
-              chiavi `_...`).
+              Export CSV/Excel disponibile nel pannello filtri in alto, sempre visibile durante la consultazione.
             </Typography>
-            <Button
-              variant="contained"
-              disabled={filteredSubmissions.length === 0}
-              onClick={exportChildrenCsv}
-            >
-              Esporta Excel (CSV) filtrato
-            </Button>
           </AccordionDetails>
         </Accordion>
 
