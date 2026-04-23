@@ -54,6 +54,24 @@ type TripStats = {
   enrolled: number;
 };
 
+const PRIMARY_FIELDS_ORDER = [
+  'cognome',
+  'nome',
+  'sesso',
+  'data_nascita',
+  'luogo_nascita',
+  'codice_fiscale',
+  'classe',
+  'sezione',
+  'email',
+  'telefono',
+  'cellulare',
+  'nome_genitore',
+  'cognome_genitore',
+  'email_genitore',
+  'telefono_genitore',
+] as const;
+
 function pct(current: number, limit: number): number {
   if (!Number.isFinite(limit) || limit <= 0) return 0;
   return Math.max(0, Math.min(100, (current / limit) * 100));
@@ -211,6 +229,72 @@ function childDisplayName(row: Record<string, unknown>): string {
   if (full) return full;
   return 'Nome non disponibile';
 }
+
+function parseFieldKey(key: string): { baseId: string; repeatIndex: number | null } {
+  const m = key.match(/^(.*)_(\d+)$/);
+  if (!m) return { baseId: key, repeatIndex: null };
+  return { baseId: m[1], repeatIndex: Number(m[2]) };
+}
+
+function withRepeatSuffix(label: string, repeatIndex: number | null): string {
+  if (repeatIndex === null) return label;
+  return `${label} #${repeatIndex + 1}`;
+}
+
+function buildFieldIndex(
+  module: Module | null
+): Map<string, { label: string; type: string; options: { value: string; label: string }[] }> {
+  const out = new Map<string, { label: string; type: string; options: { value: string; label: string }[] }>();
+  if (!module) return out;
+  for (const step of module.steps) {
+    for (const field of step.fields) {
+      out.set(field.id, {
+        label: field.label?.it?.trim() || field.id,
+        type: field.type,
+        options: (field.options ?? []).map((o) => ({
+          value: o.value,
+          label: o.label?.it?.trim() || o.value,
+        })),
+      });
+    }
+  }
+  return out;
+}
+
+function rankExportColumn(
+  key: string,
+  module: Module | null,
+  fieldIndex: Map<string, { label: string; type: string; options: { value: string; label: string }[] }>
+): [number, number, string] {
+  if (key === 'submittedAt') return [0, 0, ''];
+  const { baseId } = parseFieldKey(key);
+  const primaryIndex = PRIMARY_FIELDS_ORDER.findIndex((x) => x === baseId);
+  if (primaryIndex >= 0) return [1, primaryIndex, key];
+
+  const enrollment = module?.enrollmentCapacity;
+  if (enrollment?.enabled) {
+    if (baseId === enrollment.sedeFieldId) return [2, 0, key];
+    const weekIdx = enrollment.weekFieldIds.findIndex((x) => x === baseId);
+    if (weekIdx >= 0) return [3, weekIdx, key];
+  }
+
+  const trip = module?.tripCapacity;
+  if (trip?.enabled) {
+    const tripFields = Object.keys(trip.limitsByField);
+    const tripIdx = tripFields.findIndex((x) => x === baseId);
+    if (tripIdx >= 0) return [4, tripIdx, key];
+  }
+
+  const label = fieldIndex.get(baseId)?.label || baseId;
+  return [5, 0, `${label}::${key}`];
+}
+
+type ExportColumn = {
+  id: string;
+  header: string;
+  rank: [number, number, string];
+  value: (submission: AdminSubmissionRow) => string;
+};
 
 export default function AnalyticsPage() {
   const auth = useAuth();
@@ -389,7 +473,82 @@ export default function AnalyticsPage() {
       }
     }
     return Array.from(keys).sort((a, b) => a.localeCompare(b));
-  }, [filteredSubmissions]);
+  }, [submissions]);
+
+  const exportColumns = useMemo<ExportColumn[]>(() => {
+    const fieldIndex = buildFieldIndex(selectedModule);
+    const expectedWeekYes = selectedModule?.enrollmentCapacity?.weekParticipationValue?.trim() || 'si';
+    const out: ExportColumn[] = [
+      {
+        id: 'submittedAt',
+        header: 'Data/Ora invio',
+        rank: [0, 0, ''],
+        value: (s) => formatSubmittedAt(s.submittedAt),
+      },
+    ];
+
+    for (const key of userResponseColumns) {
+      const { baseId, repeatIndex } = parseFieldKey(key);
+      const meta = fieldIndex.get(baseId);
+      if (!meta) continue;
+      const baseRank = rankExportColumn(key, selectedModule, fieldIndex);
+      const baseLabel = withRepeatSuffix(meta.label, repeatIndex);
+
+      // UX export: checkbox-group su colonne separate (una colonna per opzione, X se selezionata).
+      if (meta.type === 'checkbox-group' && meta.options.length > 0) {
+        meta.options.forEach((opt, idx) => {
+          out.push({
+            id: `${key}::opt::${opt.value}`,
+            header: `${baseLabel} - ${opt.label}`,
+            rank: [baseRank[0], baseRank[1], `${baseRank[2]}::${String(idx).padStart(4, '0')}`],
+            value: (s) => {
+              const row = s.responses ?? {};
+              const raw = row[key];
+              if (!Array.isArray(raw)) return '';
+              return raw.some((v) => typeof v === 'string' && v === opt.value) ? 'X' : '';
+            },
+          });
+        });
+        continue;
+      }
+
+      // UX export: settimane come flag X (non si/no).
+      const isWeekField = Boolean(selectedModule?.enrollmentCapacity?.weekFieldIds.includes(baseId));
+      if (isWeekField) {
+        out.push({
+          id: key,
+          header: baseLabel,
+          rank: baseRank,
+          value: (s) => {
+            const row = s.responses ?? {};
+            return isWeekSelected(row[key], expectedWeekYes) ? 'X' : '';
+          },
+        });
+        continue;
+      }
+
+      out.push({
+        id: key,
+        header: baseLabel,
+        rank: baseRank,
+        value: (s) => {
+          const row = s.responses ?? {};
+          const v = row[key];
+          if (Array.isArray(v)) return v.join(', ');
+          if (typeof v === 'object' && v !== null) return JSON.stringify(v);
+          return v == null ? '' : String(v);
+        },
+      });
+    }
+
+    return out.sort((a, b) => {
+      const ra = a.rank;
+      const rb = b.rank;
+      if (ra[0] !== rb[0]) return ra[0] - rb[0];
+      if (ra[1] !== rb[1]) return ra[1] - rb[1];
+      return ra[2].localeCompare(rb[2], 'it');
+    });
+  }, [selectedModule, userResponseColumns]);
 
   const weekPivot = useMemo(() => {
     const byWeek = new Map<string, Map<string, SedeWeekStats>>();
@@ -417,18 +576,10 @@ export default function AnalyticsPage() {
 
   function exportChildrenCsv(): void {
     if (filteredSubmissions.length === 0) return;
-    const columns = ['submittedAt', ...userResponseColumns];
     const lines: string[] = [];
-    lines.push(columns.map(csvEscape).join(','));
+    lines.push(exportColumns.map((c) => csvEscape(c.header)).join(','));
     for (const s of filteredSubmissions) {
-      const row = s.responses ?? {};
-      const vals = columns.map((c) => {
-        if (c === 'submittedAt') return s.submittedAt ?? '';
-        const v = row[c];
-        if (Array.isArray(v)) return v.join(' | ');
-        if (typeof v === 'object' && v !== null) return JSON.stringify(v);
-        return v ?? '';
-      });
+      const vals = exportColumns.map((c) => c.value(s));
       lines.push(vals.map(csvEscape).join(','));
     }
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
@@ -768,8 +919,9 @@ export default function AnalyticsPage() {
             Export iscrizioni (Excel)
           </Typography>
           <Typography color="text.secondary" sx={{ mb: 1 }}>
-            Esporta file CSV compatibile Excel: una riga = un bambino iscritto; colonne utente + data/ora
-            iscrizione. Nessun metadato tecnico (id, guid, chiavi `_...`).
+            Esporta file CSV compatibile Excel: una riga = un bambino iscritto, con colonne ordinate in modo
+            operativo (anagrafica, sede, settimane, gite, poi il resto). Nessun metadato tecnico (id, guid,
+            chiavi `_...`).
           </Typography>
           <Button
             variant="contained"
