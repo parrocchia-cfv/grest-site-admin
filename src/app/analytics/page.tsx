@@ -434,6 +434,8 @@ export default function AnalyticsPage() {
   const [editTarget, setEditTarget] = useState<AdminSubmissionRow | null>(null);
   const [editJson, setEditJson] = useState('');
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'xlsx'>('xlsx');
+  const [exportFileName, setExportFileName] = useState('iscrizioni');
   const [exporting, setExporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [waitlistSedeFilter, setWaitlistSedeFilter] = useState('');
@@ -705,7 +707,7 @@ export default function AnalyticsPage() {
     return { headers, rows };
   }
 
-  function exportChildrenCsv(): void {
+  function exportChildrenCsv(fileBaseName?: string): void {
     if (filteredSubmissions.length === 0) return;
     const { headers, rows } = buildExportMatrix();
     const lines: string[] = [headers.map(csvEscape).join(',')];
@@ -713,33 +715,35 @@ export default function AnalyticsPage() {
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const safeId = (selectedModuleId || 'modulo').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const rawBase = (fileBaseName || '').trim() || `iscrizioni_${selectedModuleId || 'modulo'}`;
+    const safeId = rawBase.replace(/[^a-zA-Z0-9_-]/g, '_');
     a.href = url;
-    a.download = `iscrizioni_${safeId}.csv`;
+    a.download = `${safeId}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  async function exportChildrenXlsx(): Promise<void> {
+  async function exportChildrenXlsx(fileBaseName?: string): Promise<void> {
     if (filteredSubmissions.length === 0) return;
     const { headers, rows } = buildExportMatrix();
-    const safeId = (selectedModuleId || 'modulo').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const rawBase = (fileBaseName || '').trim() || `iscrizioni_${selectedModuleId || 'modulo'}`;
+    const safeId = rawBase.replace(/[^a-zA-Z0-9_-]/g, '_');
     const table = [headers, ...rows];
     const XLSX = await import('xlsx');
     const worksheet = XLSX.utils.aoa_to_sheet(table);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Iscrizioni');
-    XLSX.writeFile(workbook, `iscrizioni_${safeId}.xlsx`);
+    XLSX.writeFile(workbook, `${safeId}.xlsx`);
   }
 
-  async function handleExport(format: 'csv' | 'xlsx'): Promise<void> {
+  async function handleExport(): Promise<void> {
     if (filteredSubmissions.length === 0 || exporting) return;
     setExporting(true);
     try {
-      if (format === 'xlsx') {
-        await exportChildrenXlsx();
+      if (exportFormat === 'xlsx') {
+        await exportChildrenXlsx(exportFileName);
       } else {
-        exportChildrenCsv();
+        exportChildrenCsv(exportFileName);
       }
       setExportDialogOpen(false);
     } finally {
@@ -867,7 +871,11 @@ export default function AnalyticsPage() {
             <Button
               variant="contained"
               disabled={filteredSubmissions.length === 0}
-              onClick={() => setExportDialogOpen(true)}
+              onClick={() => {
+                if (!selectedModuleId) return;
+                setExportFileName(`iscrizioni_${selectedModuleId}`);
+                setExportDialogOpen(true);
+              }}
             >
               Esporta iscrizioni
             </Button>
@@ -1198,19 +1206,40 @@ export default function AnalyticsPage() {
         >
           <DialogTitle>Formato export</DialogTitle>
           <DialogContent>
-            <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-              Scegli il formato del file da esportare.
-            </Typography>
+            <Box sx={{ mt: 0.5, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+              <Typography color="text.secondary">
+                Scegli formato e nome del file da esportare.
+              </Typography>
+              <FormControl size="small" fullWidth>
+                <InputLabel id="export-format-label">Formato</InputLabel>
+                <Select
+                  labelId="export-format-label"
+                  label="Formato"
+                  value={exportFormat}
+                  onChange={(e) => setExportFormat(e.target.value as 'csv' | 'xlsx')}
+                  disabled={exporting}
+                >
+                  <MenuItem value="xlsx">XLSX (Excel)</MenuItem>
+                  <MenuItem value="csv">CSV</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                size="small"
+                fullWidth
+                label="Nome file"
+                value={exportFileName}
+                onChange={(e) => setExportFileName(e.target.value)}
+                disabled={exporting}
+                helperText="Senza estensione: verrà aggiunta automaticamente."
+              />
+            </Box>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setExportDialogOpen(false)} disabled={exporting}>
               Annulla
             </Button>
-            <Button onClick={() => handleExport('csv')} disabled={exporting} variant="outlined">
-              CSV
-            </Button>
-            <Button onClick={() => handleExport('xlsx')} disabled={exporting} variant="contained">
-              XLSX
+            <Button onClick={handleExport} disabled={exporting} variant="contained">
+              Esporta
             </Button>
           </DialogActions>
         </Dialog>
