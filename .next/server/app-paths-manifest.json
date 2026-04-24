@@ -1,13 +1,13 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
   "/analytics/page": "app/analytics/page.js",
-  "/forms/edit/page": "app/forms/edit/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
   "/forms/new/page": "app/forms/new/page.js",
   "/forms/page": "app/forms/page.js",
   "/login/page": "app/login/page.js",
   "/profile/page": "app/profile/page.js",
-  "/icon.svg/route": "app/icon.svg/route.js",
+  "/page": "app/page.js",
   "/users/page": "app/users/page.js",
-  "/page": "app/page.js"
+  "/forms/edit/page": "app/forms/edit/page.js",
+  "/icon.svg/route": "app/icon.svg/route.js"
 }

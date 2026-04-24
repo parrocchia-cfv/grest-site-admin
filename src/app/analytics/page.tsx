@@ -369,9 +369,24 @@ function tripSelectionsForExport(
   module: Module | null,
   fieldIndex: Map<string, { label: string; type: string; options: { value: string; label: string }[] }>
 ): string[] {
-  const tripCfg = module?.tripCapacity;
-  if (!tripCfg?.enabled) return [];
-  const tripFieldOrder = Object.keys(tripCfg.limitsByField);
+  if (!module) return [];
+  const tripCfg = module.tripCapacity;
+  const configuredTripFieldOrder = Object.keys(tripCfg?.limitsByField ?? {});
+  const detectedTripFieldOrder: string[] = [];
+  for (const step of module.steps) {
+    for (const f of step.fields) {
+      if (f.type !== 'checkbox-group') continue;
+      const idHit = /gite?|uscite?/i.test(f.id);
+      const labelHit = /gite?|uscite?/i.test(f.label?.it ?? '');
+      if (!idHit && !labelHit) continue;
+      if (!detectedTripFieldOrder.includes(f.id)) detectedTripFieldOrder.push(f.id);
+    }
+  }
+  const tripFieldOrder = [...configuredTripFieldOrder];
+  for (const fid of detectedTripFieldOrder) {
+    if (!tripFieldOrder.includes(fid)) tripFieldOrder.push(fid);
+  }
+  if (tripFieldOrder.length === 0) return [];
   const fieldPos = new Map<string, number>();
   tripFieldOrder.forEach((fid, idx) => fieldPos.set(fid, idx));
 
