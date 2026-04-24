@@ -433,6 +433,8 @@ export default function AnalyticsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [editTarget, setEditTarget] = useState<AdminSubmissionRow | null>(null);
   const [editJson, setEditJson] = useState('');
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [waitlistSedeFilter, setWaitlistSedeFilter] = useState('');
   const [waitlistWeekFilter, setWaitlistWeekFilter] = useState('');
@@ -697,14 +699,17 @@ export default function AnalyticsPage() {
     return { weekLimit, weekEnrolled, weekWait, tripLimit, tripEnrolled };
   }, [weekStats, tripStats]);
 
+  function buildExportMatrix(): { headers: string[]; rows: string[][] } {
+    const headers = exportColumns.map((c) => c.header);
+    const rows = filteredSubmissions.map((s) => exportColumns.map((c) => c.value(s)));
+    return { headers, rows };
+  }
+
   function exportChildrenCsv(): void {
     if (filteredSubmissions.length === 0) return;
-    const lines: string[] = [];
-    lines.push(exportColumns.map((c) => csvEscape(c.header)).join(','));
-    for (const s of filteredSubmissions) {
-      const vals = exportColumns.map((c) => c.value(s));
-      lines.push(vals.map(csvEscape).join(','));
-    }
+    const { headers, rows } = buildExportMatrix();
+    const lines: string[] = [headers.map(csvEscape).join(',')];
+    for (const row of rows) lines.push(row.map(csvEscape).join(','));
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -713,6 +718,33 @@ export default function AnalyticsPage() {
     a.download = `iscrizioni_${safeId}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function exportChildrenXlsx(): Promise<void> {
+    if (filteredSubmissions.length === 0) return;
+    const { headers, rows } = buildExportMatrix();
+    const safeId = (selectedModuleId || 'modulo').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const table = [headers, ...rows];
+    const XLSX = await import('xlsx');
+    const worksheet = XLSX.utils.aoa_to_sheet(table);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Iscrizioni');
+    XLSX.writeFile(workbook, `iscrizioni_${safeId}.xlsx`);
+  }
+
+  async function handleExport(format: 'csv' | 'xlsx'): Promise<void> {
+    if (filteredSubmissions.length === 0 || exporting) return;
+    setExporting(true);
+    try {
+      if (format === 'xlsx') {
+        await exportChildrenXlsx();
+      } else {
+        exportChildrenCsv();
+      }
+      setExportDialogOpen(false);
+    } finally {
+      setExporting(false);
+    }
   }
 
   function openEditDialog(row: AdminSubmissionRow): void {
@@ -835,9 +867,9 @@ export default function AnalyticsPage() {
             <Button
               variant="contained"
               disabled={filteredSubmissions.length === 0}
-              onClick={exportChildrenCsv}
+              onClick={() => setExportDialogOpen(true)}
             >
-              Esporta Excel (CSV) filtrato
+              Esporta iscrizioni
             </Button>
           </Box>
         </Paper>
@@ -1155,6 +1187,30 @@ export default function AnalyticsPage() {
             <Button onClick={() => setEditTarget(null)} disabled={actionLoading}>Annulla</Button>
             <Button onClick={handleSaveEdit} variant="contained" disabled={actionLoading}>
               Salva modifica
+            </Button>
+          </DialogActions>
+        </Dialog>
+        <Dialog
+          open={exportDialogOpen}
+          onClose={() => (exporting ? null : setExportDialogOpen(false))}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle>Formato export</DialogTitle>
+          <DialogContent>
+            <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+              Scegli il formato del file da esportare.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setExportDialogOpen(false)} disabled={exporting}>
+              Annulla
+            </Button>
+            <Button onClick={() => handleExport('csv')} disabled={exporting} variant="outlined">
+              CSV
+            </Button>
+            <Button onClick={() => handleExport('xlsx')} disabled={exporting} variant="contained">
+              XLSX
             </Button>
           </DialogActions>
         </Dialog>
