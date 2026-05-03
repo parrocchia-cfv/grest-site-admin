@@ -88,7 +88,41 @@ const SEDE_LABELS: Record<string, string> = {
   patro: 'Patronato',
   patronato: 'Patronato',
 };
-const TRIP_EXPORT_SLOTS = 3;
+const TRIP_EXPORT_MIN_SLOTS = 3;
+
+function moduleWantsTripExportColumns(m: Module | null): boolean {
+  if (!m) return false;
+  const tc = m.tripCapacity;
+  if (tc?.enabled && tc.limitsByField && Object.keys(tc.limitsByField).length > 0) return true;
+  for (const step of m.steps) {
+    for (const f of step.fields) {
+      if (f.type !== 'checkbox-group') continue;
+      const idHit = /gite?|uscite?/i.test(f.id);
+      const labelHit = /gite?|uscite?/i.test(f.label?.it ?? '');
+      if (idHit || labelHit) return true;
+    }
+  }
+  return false;
+}
+
+function tripExportSlotHeader(zeroBasedIndex: number): string {
+  const ordinals = [
+    'Prima',
+    'Seconda',
+    'Terza',
+    'Quarta',
+    'Quinta',
+    'Sesta',
+    'Settima',
+    'Ottava',
+    'Nona',
+    'Decima',
+    'Undicesima',
+    'Dodicesima',
+  ];
+  if (zeroBasedIndex >= 0 && zeroBasedIndex < ordinals.length) return `${ordinals[zeroBasedIndex]} uscita`;
+  return `${zeroBasedIndex + 1}ª uscita`;
+}
 
 function pct(current: number, limit: number): number {
   if (!Number.isFinite(limit) || limit <= 0) return 0;
@@ -646,8 +680,26 @@ export default function AnalyticsPage() {
       {
         id: 'submittedAt',
         header: 'Data/Ora invio',
-        rank: [0, 0, ''],
+        rank: [0, 0, 'meta_submitted'],
         value: (s) => formatSubmittedAt(s.submittedAt),
+      },
+      {
+        id: '__submission_id',
+        header: 'ID iscrizione',
+        rank: [0, 1, 'meta_submission_id'],
+        value: (s) => (s.id ?? '').trim(),
+      },
+      {
+        id: '__submission_group',
+        header: 'ID gruppo invio',
+        rank: [0, 2, 'meta_group'],
+        value: (s) => (s.submissionGroupId ?? '').trim(),
+      },
+      {
+        id: '__capacity_waitlist',
+        header: 'Lista attesa (settimane)',
+        rank: [0, 3, 'meta_wait_weeks'],
+        value: (s) => (isWaitlisted(s) ? 'X' : ''),
       },
     ];
 
@@ -704,11 +756,19 @@ export default function AnalyticsPage() {
       });
     }
 
-    for (let i = 0; i < TRIP_EXPORT_SLOTS; i++) {
+    let tripExportSlotCount = 0;
+    if (moduleWantsTripExportColumns(selectedModule)) {
+      for (const s of filteredSubmissions) {
+        const n = tripSelectionsForExport(s, selectedModule, fieldIndex).length;
+        if (n > tripExportSlotCount) tripExportSlotCount = n;
+      }
+      tripExportSlotCount = Math.max(tripExportSlotCount, TRIP_EXPORT_MIN_SLOTS);
+    }
+    for (let i = 0; i < tripExportSlotCount; i++) {
       out.push({
         id: `trip_slot_${i + 1}`,
-        header: i === 0 ? 'Prima uscita' : i === 1 ? 'Seconda uscita' : 'Terza uscita',
-        rank: [4, i, `trip_slot_${i + 1}`],
+        header: tripExportSlotHeader(i),
+        rank: [4, i, `trip_slot_${String(i + 1).padStart(3, '0')}`],
         value: (s) => {
           const trips = tripSelectionsForExport(s, selectedModule, fieldIndex);
           return trips[i] ?? '';
@@ -723,7 +783,7 @@ export default function AnalyticsPage() {
       if (ra[1] !== rb[1]) return ra[1] - rb[1];
       return ra[2].localeCompare(rb[2], 'it');
     });
-  }, [selectedModule, userResponseColumns]);
+  }, [selectedModule, userResponseColumns, filteredSubmissions]);
 
   const weekPivot = useMemo(() => {
     const byWeek = new Map<string, Map<string, SedeWeekStats>>();
