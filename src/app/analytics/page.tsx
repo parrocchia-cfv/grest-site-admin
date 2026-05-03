@@ -248,7 +248,39 @@ function childDisplayName(row: Record<string, unknown>): string {
   return 'Nome non disponibile';
 }
 
-function parseFieldKey(key: string): { baseId: string; repeatIndex: number | null } {
+/** ID campo ordinati per lunghezza decrescente (serve per chiavi tipo `uscite_1_2` vs ripetizioni `nome_0`). */
+function schemaFieldIdsLongestFirst(module: Module): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const step of module.steps) {
+    for (const f of step.fields) {
+      if (!seen.has(f.id)) {
+        seen.add(f.id);
+        ids.push(f.id);
+      }
+    }
+  }
+  return ids.sort((a, b) => b.length - a.length || a.localeCompare(b, 'it'));
+}
+
+/**
+ * Mappa chiave wire → campo schema + eventuale indice ripetizione.
+ * Non usare solo `_(\\d+)$`: id reali tipo `uscite_1_2` / `uscite_3_5` terminano con cifre ma non sono suffissi di repeat.
+ */
+function parseFieldKey(
+  key: string,
+  module: Module | null
+): { baseId: string; repeatIndex: number | null } {
+  if (module) {
+    for (const fid of schemaFieldIdsLongestFirst(module)) {
+      if (key === fid) return { baseId: fid, repeatIndex: null };
+      const prefixed = `${fid}_`;
+      if (key.startsWith(prefixed)) {
+        const tail = key.slice(prefixed.length);
+        if (/^\d+$/.test(tail)) return { baseId: fid, repeatIndex: Number(tail) };
+      }
+    }
+  }
   const m = key.match(/^(.*)_(\d+)$/);
   if (!m) return { baseId: key, repeatIndex: null };
   return { baseId: m[1], repeatIndex: Number(m[2]) };
@@ -304,7 +336,7 @@ function rankExportColumn(
   fieldIndex: Map<string, { label: string; type: string; options: { value: string; label: string }[] }>
 ): [number, number, string] {
   if (key === 'submittedAt') return [0, 0, ''];
-  const { baseId } = parseFieldKey(key);
+  const { baseId } = parseFieldKey(key, module);
   const primaryIndex = PRIMARY_FIELDS_ORDER.findIndex((x) => x === baseId);
   if (primaryIndex >= 0) return [1, primaryIndex, key];
 
@@ -336,9 +368,10 @@ type ExportColumn = {
 function toHumanExportValue(
   key: string,
   raw: unknown,
-  fieldMeta: { type: string; options: { value: string; label: string }[] } | undefined
+  fieldMeta: { type: string; options: { value: string; label: string }[] } | undefined,
+  module: Module | null
 ): string {
-  const { baseId } = parseFieldKey(key);
+  const { baseId } = parseFieldKey(key, module);
   const isSedeField = baseId.toLowerCase().includes('sede');
   const isClassField = baseId.toLowerCase().includes('classe') || baseId.toLowerCase().includes('class');
 
@@ -394,7 +427,7 @@ function tripSelectionsForExport(
   const responses = submission.responses ?? {};
 
   for (const [key, raw] of Object.entries(responses)) {
-    const { baseId } = parseFieldKey(key);
+    const { baseId } = parseFieldKey(key, module);
     const fo = fieldPos.get(baseId);
     if (fo === undefined) continue;
     const meta = fieldIndex.get(baseId);
@@ -619,7 +652,7 @@ export default function AnalyticsPage() {
     ];
 
     for (const key of userResponseColumns) {
-      const { baseId, repeatIndex } = parseFieldKey(key);
+      const { baseId, repeatIndex } = parseFieldKey(key, selectedModule);
       const meta = fieldIndex.get(baseId);
       if (!meta) continue;
       if (tripFieldIds.has(baseId)) continue;
@@ -666,7 +699,7 @@ export default function AnalyticsPage() {
         value: (s) => {
           const row = s.responses ?? {};
           const v = row[key];
-          return toHumanExportValue(key, v, meta);
+          return toHumanExportValue(key, v, meta, selectedModule);
         },
       });
     }
