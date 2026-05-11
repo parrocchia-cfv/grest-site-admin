@@ -37,10 +37,9 @@ import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import { buildPublicEditSubmissionUrl } from '@/lib/public-form-url';
 import {
-  buildWaitlistExportSheets,
-  downloadWaitlistCsv,
-  downloadWaitlistWorkbook,
-  waitlistExportHasRows,
+  buildWaitlistPivotSheet,
+  downloadWaitlistPivotCsv,
+  downloadWaitlistPivotWorkbook,
 } from '@/lib/waitlist-export';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -868,16 +867,16 @@ export default function AnalyticsPage() {
 
   async function handleExportWaitlistsXlsx(): Promise<void> {
     if (!selectedModule || filteredSubmissions.length === 0 || waitlistExporting) return;
-    const sheets = buildWaitlistExportSheets(selectedModule, filteredSubmissions);
-    if (!waitlistExportHasRows(sheets)) {
+    const sheet = buildWaitlistPivotSheet(selectedModule, filteredSubmissions);
+    if (!sheet) {
       setError('Nessuna iscrizione in lista d’attesa (sedi o gite) nei dati filtrati.');
       return;
     }
     setWaitlistExporting(true);
     setError(null);
     try {
-      await downloadWaitlistWorkbook(`liste_attesa_${selectedModuleId}`, sheets);
-      setNotice('File liste d’attesa (XLSX) generato.');
+      await downloadWaitlistPivotWorkbook(`liste_attesa_${selectedModuleId}`, sheet);
+      setNotice('File liste d’attesa (pivot XLSX) generato.');
     } finally {
       setWaitlistExporting(false);
     }
@@ -885,19 +884,14 @@ export default function AnalyticsPage() {
 
   function handleExportWaitlistsCsv(): void {
     if (!selectedModule || filteredSubmissions.length === 0 || waitlistExporting) return;
-    const sheets = buildWaitlistExportSheets(selectedModule, filteredSubmissions);
-    if (!waitlistExportHasRows(sheets)) {
+    const sheet = buildWaitlistPivotSheet(selectedModule, filteredSubmissions);
+    if (!sheet) {
       setError('Nessuna iscrizione in lista d’attesa (sedi o gite) nei dati filtrati.');
       return;
     }
     setError(null);
-    if (sheets.sedi) downloadWaitlistCsv(sheets.sedi, `liste_attesa_${selectedModuleId}_sedi`);
-    if (sheets.gite) downloadWaitlistCsv(sheets.gite, `liste_attesa_${selectedModuleId}_gite`);
-    setNotice(
-      sheets.sedi && sheets.gite
-        ? 'Scaricati due CSV (sedi e gite).'
-        : 'CSV lista d’attesa scaricato.'
-    );
+    downloadWaitlistPivotCsv(sheet, `liste_attesa_${selectedModuleId}_pivot`);
+    setNotice('CSV lista d’attesa (pivot) scaricato.');
   }
 
   function openEditDialog(row: AdminSubmissionRow): void {
