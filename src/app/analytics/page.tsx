@@ -36,6 +36,12 @@ import Accordion from '@mui/material/Accordion';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import { buildPublicEditSubmissionUrl } from '@/lib/public-form-url';
+import {
+  buildWaitlistExportSheets,
+  downloadWaitlistCsv,
+  downloadWaitlistWorkbook,
+  waitlistExportHasRows,
+} from '@/lib/waitlist-export';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -519,6 +525,7 @@ export default function AnalyticsPage() {
   const [exportFormat, setExportFormat] = useState<'csv' | 'xlsx'>('xlsx');
   const [exportFileName, setExportFileName] = useState('iscrizioni');
   const [exporting, setExporting] = useState(false);
+  const [waitlistExporting, setWaitlistExporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [waitlistSedeFilter, setWaitlistSedeFilter] = useState('');
   const [waitlistWeekFilter, setWaitlistWeekFilter] = useState('');
@@ -859,6 +866,40 @@ export default function AnalyticsPage() {
     }
   }
 
+  async function handleExportWaitlistsXlsx(): Promise<void> {
+    if (!selectedModule || filteredSubmissions.length === 0 || waitlistExporting) return;
+    const sheets = buildWaitlistExportSheets(selectedModule, filteredSubmissions);
+    if (!waitlistExportHasRows(sheets)) {
+      setError('Nessuna iscrizione in lista d’attesa (sedi o gite) nei dati filtrati.');
+      return;
+    }
+    setWaitlistExporting(true);
+    setError(null);
+    try {
+      await downloadWaitlistWorkbook(`liste_attesa_${selectedModuleId}`, sheets);
+      setNotice('File liste d’attesa (XLSX) generato.');
+    } finally {
+      setWaitlistExporting(false);
+    }
+  }
+
+  function handleExportWaitlistsCsv(): void {
+    if (!selectedModule || filteredSubmissions.length === 0 || waitlistExporting) return;
+    const sheets = buildWaitlistExportSheets(selectedModule, filteredSubmissions);
+    if (!waitlistExportHasRows(sheets)) {
+      setError('Nessuna iscrizione in lista d’attesa (sedi o gite) nei dati filtrati.');
+      return;
+    }
+    setError(null);
+    if (sheets.sedi) downloadWaitlistCsv(sheets.sedi, `liste_attesa_${selectedModuleId}_sedi`);
+    if (sheets.gite) downloadWaitlistCsv(sheets.gite, `liste_attesa_${selectedModuleId}_gite`);
+    setNotice(
+      sheets.sedi && sheets.gite
+        ? 'Scaricati due CSV (sedi e gite).'
+        : 'CSV lista d’attesa scaricato.'
+    );
+  }
+
   function openEditDialog(row: AdminSubmissionRow): void {
     setEditTarget(row);
     setEditJson(JSON.stringify(row.responses ?? {}, null, 2));
@@ -975,7 +1016,38 @@ export default function AnalyticsPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Es. mario, rossi, 1e, 2026-06, @mail..."
           />
-          <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'flex-end' }}>
+          <Box
+            sx={{
+              mt: 1.5,
+              display: 'flex',
+              justifyContent: 'flex-end',
+              flexWrap: 'wrap',
+              gap: 1,
+            }}
+          >
+            <Button
+              variant="outlined"
+              disabled={
+                filteredSubmissions.length === 0 ||
+                !selectedModule ||
+                waitlistExporting ||
+                (!selectedModule.enrollmentCapacity?.enabled && !selectedModule.tripCapacity?.enabled)
+              }
+              onClick={() => void handleExportWaitlistsXlsx()}
+            >
+              {waitlistExporting ? 'Export…' : 'Liste d’attesa (XLSX)'}
+            </Button>
+            <Button
+              variant="outlined"
+              disabled={
+                filteredSubmissions.length === 0 ||
+                !selectedModule ||
+                (!selectedModule.enrollmentCapacity?.enabled && !selectedModule.tripCapacity?.enabled)
+              }
+              onClick={handleExportWaitlistsCsv}
+            >
+              Liste d’attesa (CSV)
+            </Button>
             <Button
               variant="contained"
               disabled={filteredSubmissions.length === 0}
