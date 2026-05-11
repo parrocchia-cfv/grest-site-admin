@@ -238,7 +238,7 @@ export function buildWaitlistExportSheets(
       const row = s.responses ?? {};
       if ((row as Record<string, unknown>)._tripCapacityWaitlisted !== true) continue;
       const detailRaw = formatTripWaitlistDetail(module, row as Record<string, unknown>);
-      const detail = detailRaw.trim() ? detailRaw : '— (dettaglio gite non disponibile)';
+      if (!detailRaw.trim()) continue;
       giteRows.push([
         formatSubmittedAt(s.submittedAt),
         s.submittedAt ?? '',
@@ -247,7 +247,7 @@ export function buildWaitlistExportSheets(
         childDisplayName(row),
         pickDataNascita(row),
         pickClasse(row),
-        detail,
+        detailRaw,
         firstNonEmptyString(row, ['email', 'email_genitore']),
         firstNonEmptyString(row, ['telefono', 'telefono_genitore']),
         firstNonEmptyString(row, ['cellulare', 'cellulare_genitore']),
@@ -372,11 +372,11 @@ export function buildWaitlistPivotSheet(
 
   if (weekIds.length === 0 && tripOptions.length === 0) return null;
 
+  const moduleGuid = (module.guid?.trim() || module.id).trim();
+
   const baseHeaders: string[] = [
     'Data/Ora invio',
     'Data invio (ISO)',
-    'ID iscrizione',
-    'ID gruppo invio',
     'Nominativo minore',
     'Data di nascita',
     'Classe',
@@ -388,7 +388,9 @@ export function buildWaitlistPivotSheet(
   const weekHeaders = weekIds.map((wid) => shortenHeader(weekWaitlistLabel(module, wid)));
   const tripHeaders = tripOptions.map((t) => t.header);
 
-  const headers = [...baseHeaders, ...weekHeaders, ...tripHeaders];
+  const tailHeaders = ['GUID modulo', 'GUID iscrizione (riga)', 'GUID gruppo invio'];
+
+  const headers = [...baseHeaders, ...weekHeaders, ...tripHeaders, ...tailHeaders];
 
   type SortRow = { sortKey: string; cells: string[] };
   const rows: SortRow[] = [];
@@ -407,15 +409,6 @@ export function buildWaitlistPivotSheet(
     const hasTripWaitlisted = (row as Record<string, unknown>)._tripCapacityWaitlisted === true;
     const tripDetailRaw = (row as Record<string, unknown>)._tripCapacityWaitlistedByField;
 
-    // Include la riga se è in attesa per almeno una delle due categorie.
-    // Per le settimane richiediamo anche che la lista `_capacityWaitlistedWeeks` abbia almeno un elemento.
-    if (
-      !(hasTripWaitlisted || (hasSeatWaitlisted && waitWeeks.length > 0))
-    ) {
-      continue;
-    }
-
-    const waitWeekSet = new Set<string>(waitWeeks);
     const tripWaitSet = new Set<string>();
     if (hasTripWaitlisted && tripDetailRaw && typeof tripDetailRaw === 'object' && !Array.isArray(tripDetailRaw)) {
       for (const [fieldId, opts] of Object.entries(tripDetailRaw as Record<string, unknown>)) {
@@ -427,6 +420,10 @@ export function buildWaitlistPivotSheet(
       }
     }
 
+    const hasSeatWaitlist = hasSeatWaitlisted && waitWeeks.length > 0;
+    const hasTripWaitlist = tripWaitSet.size > 0;
+    if (!hasSeatWaitlist && !hasTripWaitlist) continue;
+
     const iso = s.submittedAt ?? '';
     const sedeRaw = ec?.enabled ? row[ec.sedeFieldId] : undefined;
     const sede =
@@ -437,8 +434,6 @@ export function buildWaitlistPivotSheet(
     const cellsBase: string[] = [
       formatSubmittedAt(s.submittedAt),
       iso,
-      s.id ?? '',
-      s.submissionGroupId ?? '',
       childDisplayName(row),
       pickDataNascita(row),
       pickClasse(row),
@@ -450,10 +445,18 @@ export function buildWaitlistPivotSheet(
       firstNonEmptyString(row, ['cellulare', 'cellulare_genitore'])
     );
 
-    const weekCells = weekIds.map((wid) => (waitWeekSet.has(wid) ? 'X' : ''));
+    const weekCells = weekIds.map((wid) => {
+      for (const w of waitWeeks) {
+        const { baseId } = parseFieldKey(w, module);
+        if (baseId === wid) return 'X';
+      }
+      return '';
+    });
     const tripCells = tripOptions.map((t) => (tripWaitSet.has(`${t.fieldId}::${t.optionValue}`) ? 'X' : ''));
 
-    rows.push({ sortKey: iso, cells: [...cellsBase, ...weekCells, ...tripCells] });
+    const tailCells = [moduleGuid, s.id ?? '', s.submissionGroupId ?? ''];
+
+    rows.push({ sortKey: iso, cells: [...cellsBase, ...weekCells, ...tripCells, ...tailCells] });
   }
 
   rows.sort((a, b) => (a.sortKey || '').localeCompare(b.sortKey || ''));
